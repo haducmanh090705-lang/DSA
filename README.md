@@ -1,1 +1,152 @@
-# DSA
+import csv
+import math
+
+# =========================
+# HÀM HỖ TRỢ
+# =========================
+
+def norm_diff(a, b, max_val):
+    """
+    Chuẩn hóa độ khác biệt về [0,1]
+    """
+    return abs(a - b) / max_val if max_val != 0 else 0
+
+
+def binary_diff(a, b):
+    """
+    So sánh tiêu chí nhị phân (0/1)
+    """
+    return 0 if a == b else 1
+
+
+def haversine(lat1, lon1, lat2, lon2):
+    """
+    Tính khoảng cách địa lý (km)
+    """
+    R = 6371  # Bán kính Trái Đất (km)
+
+    lat1, lon1, lat2, lon2 = map(math.radians,
+                                 [lat1, lon1, lat2, lon2])
+
+    dlat = lat2 - lat1
+    dlon = lon2 - lon1
+
+    a = (math.sin(dlat / 2) ** 2 +
+         math.cos(lat1) * math.cos(lat2) *
+         math.sin(dlon / 2) ** 2)
+
+    c = 2 * math.asin(math.sqrt(a))
+    return R * c
+
+
+# =========================
+# ĐỌC DỮ LIỆU CSV
+# =========================
+
+def load_students(csv_path):
+    students = []
+
+    with open(csv_path, newline='', encoding='utf-8') as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            students.append({
+                "id": row["ID"],
+                "name": row["Name"],
+                "school": row["School"],
+                "budget": float(row["Budget"]),
+                "sleep": float(row["Sleep_Time"]),
+                "personality": int(row["Personality"]),
+                "pet": int(row["Pet"]),
+                "clean": float(row["Cleanliness"]),
+                "lat": float(row["Latitude"]),
+                "lon": float(row["Longitude"]),
+            })
+
+    return students
+
+
+# =========================
+# TÍNH WEIGHT (DISSIMILARITY)
+# =========================
+
+def calculate_weight(user, student, alpha, max_budget, max_sleep, max_clean, max_distance):
+    weight = 0
+
+    weight += alpha["school"] * binary_diff(user["school"], student["school"])
+    weight += alpha["budget"] * norm_diff(user["budget"], student["budget"], max_budget)
+    weight += alpha["sleep"] * norm_diff(user["sleep"], student["sleep"], max_sleep)
+    weight += alpha["clean"] * norm_diff(user["clean"], student["clean"], max_clean)
+    weight += alpha["personality"] * binary_diff(user["personality"], student["personality"])
+    weight += alpha["pet"] * binary_diff(user["pet"], student["pet"])
+
+    dist = haversine(user["lat"], user["lon"], student["lat"], student["lon"])
+    weight += alpha["distance"] * norm_diff(dist, 0, max_distance)
+
+    return weight
+
+
+# =========================
+# KRUSKAL RANKING (SORT)
+# =========================
+
+def kruskal_ranking(user, students, alpha):
+    edges = []
+
+    max_budget = max(s["budget"] for s in students)
+    max_sleep = 24
+    max_clean = 10
+    max_distance = 30  # km (giả định)
+
+    for s in students:
+        w = calculate_weight(user, s, alpha,
+                              max_budget, max_sleep, max_clean, max_distance)
+        edges.append((s, w))
+# Kruskal trên đồ thị ngôi sao = sort theo weight
+    edges.sort(key=lambda x: x[1])
+
+    return edges
+
+
+# =========================
+# MAIN
+# =========================
+
+def main():
+    # ===== USER INPUT =====
+    user = {
+        "school": input("Trường học: "),
+        "budget": float(input("Ngân sách: ")),
+        "sleep": float(input("Giờ ngủ (vd 23.5): ")),
+        "personality": int(input("Hướng nội(0) / Hướng ngoại(1): ")),
+        "pet": int(input("Nuôi thú cưng? Không(0) / Có(1): ")),
+        "clean": float(input("Mức độ sạch sẽ (1-10): ")),
+        "lat": float(input("Vĩ độ: ")),
+        "lon": float(input("Kinh độ: "))
+    }
+
+    # ===== TRỌNG SỐ ĐỘNG =====
+    alpha = {
+        "school": 0.10,
+        "budget": 0.25,
+        "sleep": 0.25,
+        "clean": 0.15,
+        "personality": 0.10,
+        "pet": 0.05,
+        "distance": 0.10
+    }
+
+    # ===== LOAD DATA =====
+    csv_path = "students_sample.csv"  # <-- 
+    students = load_students(csv_path)
+
+    # ===== RUN =====
+    ranked = kruskal_ranking(user, students, alpha)
+
+    # ===== OUTPUT =====
+    print("\nDanh sách sinh viên phù hợp (từ cao → thấp):")
+    for s, w in ranked:
+        print(f"{s['name']} | Weight = {round(w, 3)}")
+
+
+if __name__ == "__main__":
+    main()
